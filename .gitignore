@@ -1,0 +1,4 @@
+.DS_Store
+
+# Local Cursor workspace context (handoff for new sessions); do not sync to GitHub
+.cursor/

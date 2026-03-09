@@ -1,0 +1,38 @@
+# Postman API onboarding: Payment Refund Service
+# Uses postman-api-onboarding-action (bootstrap + repo-sync) against a real Postman workspace.
+# Trigger manually from Actions tab. Ensure POSTMAN_API_KEY and POSTMAN_ACCESS_TOKEN are set as repo secrets.
+# Runs from repo root (this repo is the service).
+
+name: Postman onboarding (payment-refund)
+
+on:
+  workflow_dispatch:
+
+jobs:
+  onboarding:
+    runs-on: ubuntu-latest
+    permissions:
+      actions: write
+      contents: write
+      variables: write
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Run Postman API onboarding
+        uses: postman-cs/postman-api-onboarding-action@v0
+        with:
+          project-name: payment-refund-api
+          domain: payments
+          domain-code: PMT
+          spec-url: https://raw.githubusercontent.com/tsailifehighlights/payment-refund-service/main/specs/payment-refund-api-openapi.yaml
+          environments-json: '["prod","uat","qa","dev"]'
+          env-runtime-urls-json: '{"prod":"https://api.payments.example.com/v2","uat":"https://api-uat.payments.example.com/v2","qa":"https://api-qa.payments.example.com/v2","dev":"https://api-dev.payments.example.com/v2"}'
+          governance-mapping-json: '{"payments":"Payments"}'
+          system-env-map-json: '{}'
+          generate-ci-workflow: true
+          ci-workflow-path: .github/workflows/ci.yml
+          repo-write-mode: commit-and-push
+          postman-api-key: ${{ secrets.POSTMAN_API_KEY }}
+          postman-access-token: ${{ secrets.POSTMAN_ACCESS_TOKEN }}
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          gh-fallback-token: ${{ secrets.GH_FALLBACK_TOKEN }}
