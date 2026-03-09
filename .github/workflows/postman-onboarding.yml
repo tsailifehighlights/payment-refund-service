@@ -1,7 +1,7 @@
 # Postman API onboarding: Payment Refund Service
-# Uses postman-api-onboarding-action (bootstrap + repo-sync) against a real Postman workspace.
-# Trigger manually from Actions tab. Ensure POSTMAN_API_KEY and POSTMAN_ACCESS_TOKEN are set as repo secrets.
-# Runs from repo root (this repo is the service).
+# Composite action: bootstrap (workspace, spec, collections) + repo-sync (export to repo).
+# Trigger: Actions tab -> Postman onboarding (payment-refund) -> Run workflow.
+# Secrets: POSTMAN_API_KEY, POSTMAN_ACCESS_TOKEN (optional: GH_FALLBACK_TOKEN).
 
 name: Postman onboarding (payment-refund)
 
@@ -14,7 +14,6 @@ jobs:
     permissions:
       actions: write
       contents: write
-      variables: write
     steps:
       - uses: actions/checkout@v4
 

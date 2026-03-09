@@ -2,3 +2,4 @@
 
 # Local Cursor workspace context (handoff for new sessions); do not sync to GitHub
 .cursor/
+PROJECT_CONTEXT.md
