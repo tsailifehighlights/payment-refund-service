@@ -171,8 +171,8 @@ jobs:
           # ⚠ REPLACE or blank out these UUIDs:
           system-env-map-json: >-
             {
-              "prod": "SYSTEM_ENV_UUID_PROD",
-              "uat":  "SYSTEM_ENV_UUID_UAT"
+              "prod": "",
+              "uat":  ""
             }
 
           # governance-mapping-json maps domain names to Postman governance
