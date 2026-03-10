@@ -36,7 +36,6 @@ jobs:
     permissions:
       actions: write
       contents: write
-      variables: write   # Required to write/update repository variables
 
     steps:
       - name: Checkout repository
