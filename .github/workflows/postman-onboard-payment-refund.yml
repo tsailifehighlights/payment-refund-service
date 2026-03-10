@@ -3,12 +3,9 @@
 # Postman Onboarding Workflow — Payment Refund Service
 # =====================================================
 # CHANGE LOG vs previous version:
-#   - Added workspace-id, spec-id, and all collection/environment ID inputs
-#     that read from saved repository variables (vars.POSTMAN_*).
-#     This prevents duplicate workspace/collection creation on re-runs.
-#   - Added force_recreate logic: when triggered manually with force_recreate=true,
-#     the saved IDs are intentionally omitted so resources are recreated fresh.
-#   - Added variables: write permission (required to save repo variables).
+#   - Added qa and dev environments to environments-json (was prod + uat only)
+#   - Added qa and dev URLs to env-runtime-urls-json
+#   - Added qa and dev keys to system-env-map-json
 
 name: Postman Onboarding — Payment Refund Service
 
@@ -41,13 +38,6 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      # ── Determine run mode ────────────────────────────────────────────────
-      # On first run: vars.POSTMAN_WORKSPACE_ID is empty → action creates fresh
-      # On subsequent runs: vars.POSTMAN_WORKSPACE_ID is populated → action
-      #   updates existing resources in-place (no duplicates).
-      # Manual runs with force_recreate=true: IDs intentionally omitted →
-      #   action creates fresh regardless of saved state.
-      # ─────────────────────────────────────────────────────────────────────
       - name: Onboard Payment Refund API
         uses: postman-cs/postman-api-onboarding-action@v0
         with:
@@ -57,24 +47,11 @@ jobs:
           domain-code: PAY
 
           # ── Existing resource IDs (populated after first run) ─────────────
-          # These read from repository variables saved by the action on the
-          # previous run. When populated, the action skips creation and updates
-          # existing Postman resources in-place — no new workspaces created.
-          #
-          # On first run: all vars.POSTMAN_* are empty → action creates fresh.
-          # On re-runs: contain real UUIDs → action uses update/existing mode.
-          # force_recreate=true: || '' keeps them blank → forces fresh creation.
-          #
-          # Variable names match exactly what the action writes to repo vars
-          # (confirmed from your repository variables screenshot):
           workspace-id: ${{ inputs.force_recreate != 'true' && vars.POSTMAN_WORKSPACE_ID || '' }}
           spec-id: ${{ inputs.force_recreate != 'true' && vars.POSTMAN_SPEC_UID || '' }}
           baseline-collection-id: ${{ inputs.force_recreate != 'true' && vars.POSTMAN_BASELINE_COLLECTION_UID || '' }}
           smoke-collection-id: ${{ inputs.force_recreate != 'true' && vars.POSTMAN_SMOKE_COLLECTION_UID || '' }}
           contract-collection-id: ${{ inputs.force_recreate != 'true' && vars.POSTMAN_CONTRACT_COLLECTION_UID || '' }}
-
-          # Pass back saved environment UIDs so existing environments are
-          # updated rather than duplicated each run.
           environment-uids-json: ${{ inputs.force_recreate != 'true' && vars.POSTMAN_ENV_UIDS_JSON || '{}' }}
 
           # ── Ownership ─────────────────────────────────────────────────────
@@ -85,18 +62,25 @@ jobs:
           spec-url: https://raw.githubusercontent.com/tsailifehighlights/payment-refund-service/main/specs/payment-refund-api-openapi.yaml
 
           # ── Environments ──────────────────────────────────────────────────
-          environments-json: '["prod","uat"]'
+          # CHANGED: added qa and dev to match all 4 servers in the spec
+          environments-json: '["prod","uat","qa","dev"]'
 
+          # CHANGED: added qa and dev URLs from spec servers block
           env-runtime-urls-json: >-
             {
               "prod": "https://api.payments.example.com/v2",
-              "uat":  "https://api-uat.payments.example.com/v2"
+              "uat":  "https://api-uat.payments.example.com/v2",
+              "qa":   "https://api-qa.payments.example.com/v2",
+              "dev":  "https://api-dev.payments.example.com/v2"
             }
 
+          # CHANGED: added qa and dev keys — must always match environments-json
           system-env-map-json: >-
             {
               "prod": "",
-              "uat":  ""
+              "uat":  "",
+              "qa":   "",
+              "dev":  ""
             }
 
           governance-mapping-json: '{"payments":"Payments Platform"}'
