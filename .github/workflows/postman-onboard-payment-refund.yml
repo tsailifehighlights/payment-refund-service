@@ -2,60 +2,17 @@
 #
 # Postman Onboarding Workflow — Payment Refund Service
 # =====================================================
-# This workflow onboards the Payment Refund API (OpenAPI v2.1.0) into a Postman
-# workspace using the postman-api-onboarding-action orchestrator, which internally
-# chains postman-bootstrap-action and postman-repo-sync-action.
-#
-# What this workflow does (end-to-end):
-#   1. Creates a dedicated Postman workspace for the payment-refund service
-#   2. Uploads the OpenAPI spec to Spec Hub
-#   3. Auto-generates three collections: baseline, smoke, and contract tests
-#   4. Creates and configures environments (prod + uat)
-#   5. Exports all generated collections back to this repo (committed + pushed)
-#   6. Optionally generates a CI workflow stub for Newman/Postman CLI test runs
-#
-# ─── REQUIRED SETUP BEFORE FIRST RUN ────────────────────────────────────────
-#
-# GitHub Secrets (Settings → Secrets and variables → Actions → New repository secret):
-#
-#   POSTMAN_API_KEY        — Your Postman API key (PMAK-...)
-#                            Generate at: https://go.postman.co/settings/me/api-keys
-#
-#   POSTMAN_ACCESS_TOKEN   — Session token for governance/workspace-linking features
-#                            Obtain via: `postman login` then
-#                            `cat ~/.postman/postmanrc | jq -r '.login._profiles[].accessToken'`
-#                            ⚠ This token is session-scoped and WILL expire.
-#                            Without it, workspace linking and governance assignment
-#                            are silently skipped — the rest of the workflow still runs.
-#
-#   GH_FALLBACK_TOKEN      — A GitHub PAT with `repo` + `workflow` scopes.
-#                            Required because the default GITHUB_TOKEN cannot
-#                            trigger new workflow runs or push commits that kick
-#                            off downstream CI. Generate at:
-#                            GitHub → Settings → Developer settings → Personal access tokens
-#
-# GitHub Variables (Settings → Secrets and variables → Actions → Variables tab):
-#   None required on first run. The actions persist workspace/spec/collection
-#   IDs here automatically after the first successful run so subsequent runs
-#   update-in-place rather than creating duplicate resources.
-#
-# ─── PLACEHOLDER VALUES YOU MUST REPLACE ────────────────────────────────────
-#
-#   YOUR_GITHUB_USERNAME     — Your GitHub username or org (used in spec-url)
-#   YOUR_REPO_NAME           — This repository's name (used in spec-url)
-#   YOUR_EMAIL@EXAMPLE.COM   — Email of the Postman workspace owner/requester
-#   POSTMAN_USER_ID_1        — Postman numeric user ID(s) to grant workspace admin
-#                              Find yours at: https://go.postman.co/settings/me
-#   SYSTEM_ENV_UUID_PROD     — (Optional) UUID of a pre-existing Postman system
-#   SYSTEM_ENV_UUID_UAT        environment to link to. Leave empty string "" if
-#                              you don't have pre-configured system environments.
-#
-# ─────────────────────────────────────────────────────────────────────────────
+# CHANGE LOG vs previous version:
+#   - Added workspace-id, spec-id, and all collection/environment ID inputs
+#     that read from saved repository variables (vars.POSTMAN_*).
+#     This prevents duplicate workspace/collection creation on re-runs.
+#   - Added force_recreate logic: when triggered manually with force_recreate=true,
+#     the saved IDs are intentionally omitted so resources are recreated fresh.
+#   - Added variables: write permission (required to save repo variables).
 
 name: Postman Onboarding — Payment Refund Service
 
 on:
-  # Run automatically when the spec or workflow file changes on main
   push:
     branches:
       - main
@@ -63,7 +20,6 @@ on:
       - 'specs/payment-refund-api-openapi.yaml'
       - '.github/workflows/postman-onboard-payment-refund.yml'
 
-  # Allow manual re-runs from the Actions tab (useful for re-sync after changes)
   workflow_dispatch:
     inputs:
       force_recreate:
@@ -77,133 +33,77 @@ jobs:
     name: Onboard Payment Refund API to Postman
     runs-on: ubuntu-latest
 
-    # These permissions are required by the action to:
-    #   actions: write  — save workspace/collection IDs as repository variables
-    #   contents: write — commit exported collections back to this repo
     permissions:
       actions: write
       contents: write
+      variables: write   # Required to write/update repository variables
 
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      # ── Core onboarding step ──────────────────────────────────────────────
-      # postman-api-onboarding-action is the end-to-end orchestrator.
-      # It internally calls:
-      #   1. postman-bootstrap-action  → creates workspace, uploads spec,
-      #                                  generates collections + environments
-      #   2. postman-repo-sync-action  → exports collections to repo,
-      #                                  creates mock server + monitors,
-      #                                  generates Newman CI workflow stub
-      #
-      # On first run: all resources are created fresh.
-      # On subsequent runs: saved repository variables (workspace-id, spec-id,
-      # collection IDs) are read back so existing resources are updated, not
-      # duplicated.
+      # ── Determine run mode ────────────────────────────────────────────────
+      # On first run: vars.POSTMAN_WORKSPACE_ID is empty → action creates fresh
+      # On subsequent runs: vars.POSTMAN_WORKSPACE_ID is populated → action
+      #   updates existing resources in-place (no duplicates).
+      # Manual runs with force_recreate=true: IDs intentionally omitted →
+      #   action creates fresh regardless of saved state.
       # ─────────────────────────────────────────────────────────────────────
       - name: Onboard Payment Refund API
         uses: postman-cs/postman-api-onboarding-action@v0
         with:
-          # ── Service identity ─────────────────────────────────────────────
-          # project-name becomes the Postman workspace name and is used as a
-          # prefix for all generated collection names. Use kebab-case.
+          # ── Service identity ──────────────────────────────────────────────
           project-name: payment-refund-service
-
-          # domain groups this service under a logical product area in Postman.
-          # Used for workspace tagging and governance policy assignment.
           domain: payments
-
-          # domain-code is a short prefix applied to generated artifact names
-          # (e.g., collection names will be prefixed "PAY-").
           domain-code: PAY
 
-          # ── Ownership ────────────────────────────────────────────────────
-          # requester-email: the Postman account email of the service owner.
-          # This user becomes the workspace owner.
-          # ⚠ REPLACE THIS:
-          requester-email: andrew.sd.tsai@gmail.com
+          # ── Existing resource IDs (populated after first run) ─────────────
+          # These read from repository variables saved by the action on the
+          # previous run. When populated, the action skips creation and updates
+          # existing Postman resources in-place — no new workspaces created.
+          #
+          # On first run: all vars.POSTMAN_* are empty → action creates fresh.
+          # On re-runs: contain real UUIDs → action uses update/existing mode.
+          # force_recreate=true: || '' keeps them blank → forces fresh creation.
+          #
+          # Variable names match exactly what the action writes to repo vars
+          # (confirmed from your repository variables screenshot):
+          workspace-id: ${{ inputs.force_recreate != 'true' && vars.POSTMAN_WORKSPACE_ID || '' }}
+          spec-id: ${{ inputs.force_recreate != 'true' && vars.POSTMAN_SPEC_UID || '' }}
+          baseline-collection-id: ${{ inputs.force_recreate != 'true' && vars.POSTMAN_BASELINE_COLLECTION_UID || '' }}
+          smoke-collection-id: ${{ inputs.force_recreate != 'true' && vars.POSTMAN_SMOKE_COLLECTION_UID || '' }}
+          contract-collection-id: ${{ inputs.force_recreate != 'true' && vars.POSTMAN_CONTRACT_COLLECTION_UID || '' }}
 
-          # workspace-admin-user-ids: comma-separated Postman user IDs to grant
-          # workspace Admin role. Find your ID at https://go.postman.co/settings/me
-          # ⚠ REPLACE THIS (can be a single ID, no trailing comma):
+          # Pass back saved environment UIDs so existing environments are
+          # updated rather than duplicated each run.
+          environment-uids-json: ${{ inputs.force_recreate != 'true' && vars.POSTMAN_ENV_UIDS_JSON || '{}' }}
+
+          # ── Ownership ─────────────────────────────────────────────────────
+          requester-email: andrew.sd.tsai@gmail.com
           workspace-admin-user-ids: "53049599"
 
-          # ── Spec location ────────────────────────────────────────────────
-          # spec-url must be a publicly fetchable URL at workflow run time.
-          # Using the raw GitHub URL of the spec checked into this repo is the
-          # recommended pattern — no separate hosting required.
-          # ⚠ REPLACE YOUR_GITHUB_USERNAME and YOUR_REPO_NAME:
+          # ── Spec location ─────────────────────────────────────────────────
           spec-url: https://raw.githubusercontent.com/tsailifehighlights/payment-refund-service/main/specs/payment-refund-api-openapi.yaml
 
-          # ── Environments ─────────────────────────────────────────────────
-          # The spec declares four server URLs (prod, uat, qa, dev). We onboard
-          # prod and uat here as the primary environments. Add "qa","dev" to the
-          # array below if you want all four environments scaffolded in Postman.
-          #
-          # Each entry in environments-json maps to:
-          #   - A Postman environment (with {{baseUrl}} variable pre-populated)
-          #   - A monitor (if monitoring is enabled in repo-sync-action)
+          # ── Environments ──────────────────────────────────────────────────
           environments-json: '["prod","uat"]'
 
-          # env-runtime-urls-json maps each environment name to its base URL.
-          # These come directly from the `servers` block in the OpenAPI spec.
-          # The action uses these to pre-populate the {{baseUrl}} variable in
-          # each generated Postman environment.
           env-runtime-urls-json: >-
             {
               "prod": "https://api.payments.example.com/v2",
               "uat":  "https://api-uat.payments.example.com/v2"
             }
 
-          # system-env-map-json links generated environments to pre-existing
-          # Postman "system environments" (shared org-level environments that
-          # hold secrets like OAuth tokens).
-          #
-          # If your Postman org already has system environments provisioned
-          # (e.g., a shared "Production Secrets" environment), supply their
-          # UUIDs here. The action will link and inherit variables from them.
-          #
-          # If you DON'T have system environments yet, set both values to "":
-          #   '{"prod":"","uat":""}'
-          # The action will still create standalone environments — governance
-          # linking will simply be skipped.
-          # ⚠ REPLACE or blank out these UUIDs:
           system-env-map-json: >-
             {
               "prod": "",
               "uat":  ""
             }
 
-          # governance-mapping-json maps domain names to Postman governance
-          # policy display names. Used to auto-assign governance rules to the
-          # generated workspace. If your org hasn't configured governance
-          # policies yet, this input is safely ignored.
           governance-mapping-json: '{"payments":"Payments Platform"}'
 
-          # ── Auth note (informational — not an action input) ───────────────
-          # The spec declares two security schemes:
-          #   OAuth2: Bearer token for external partners
-          #   JWT:    Bearer token for internal services
-          #
-          # The bootstrap action generates a Postman environment variable
-          # `{{bearerToken}}` as a placeholder. Your team will need to populate
-          # this variable with a real token when running collections manually
-          # or via Newman in CI. For automated test runs, inject the token via
-          # a GitHub secret passed to Newman (see generated CI workflow stub).
-          # ─────────────────────────────────────────────────────────────────
-
-          # ── Authentication ───────────────────────────────────────────────
+          # ── Authentication ────────────────────────────────────────────────
           postman-api-key: ${{ secrets.POSTMAN_API_KEY }}
-
-          # POSTMAN_ACCESS_TOKEN enables workspace linking + governance features.
-          # If the secret is empty/missing, those features are silently skipped.
           postman-access-token: ${{ secrets.POSTMAN_ACCESS_TOKEN }}
-
-          # GITHUB_TOKEN is used by the action to save repo variables and
-          # commit exported collections back to this repo.
           github-token: ${{ secrets.GITHUB_TOKEN }}
-
-          # GH_FALLBACK_TOKEN (PAT) is used when GITHUB_TOKEN lacks sufficient
-          # permissions to trigger workflow runs or push to protected branches.
           gh-fallback-token: ${{ secrets.GH_FALLBACK_TOKEN }}
