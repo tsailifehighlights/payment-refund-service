@@ -2,10 +2,11 @@
 #
 # Postman Onboarding Workflow — Payment Refund Service
 # =====================================================
-# CHANGE LOG vs previous version:
-#   - Added qa and dev environments to environments-json (was prod + uat only)
-#   - Added qa and dev URLs to env-runtime-urls-json
-#   - Added qa and dev keys to system-env-map-json
+# ─── REQUIRED SECRETS --------------------------------────────────────────────
+#   POSTMAN_API_KEY        — Postman API key (PMAK-...)
+#   POSTMAN_ACCESS_TOKEN   — Session token (expires; governance skipped if missing)
+#   GH_FALLBACK_TOKEN      — GitHub PAT with repo + workflow scopes
+# ─────────────────────────────────────────────────────────────────────────────
 
 name: Postman Onboarding — Payment Refund Service
 

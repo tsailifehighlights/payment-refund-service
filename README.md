@@ -40,6 +40,8 @@ The composite orchestrator handles input/output wiring between these two actions
 
 ## Universal vs. Per-Service Configuration
 
+> **Note:** For a small amount of services, per-repo GitHub Action Workflow files are used. As the team scales to additional services, we'll want to explore ways to reduce maintenance overhead. These are explored in the Adaptation plan and could include creating a reusable workflow stored in a central repo, a boilerplate template with Cookiecutter, or a monorepo for all specs
+
 | Aspect | Universal (unchanged) | Per-Service (must update) |
 |---|---|---|
 | Action reference | `postman-cs/postman-api-onboarding-action@v0` | — |
@@ -72,6 +74,7 @@ The following cannot be configured without customer access and must be provided 
 - **System environment IDs** — If the Postman org uses system environments, populate `system-env-map-json` with the corresponding Postman system environment UUIDs (found in Postman Admin Console). Currently empty; Bifrost environment association is silently skipped without them.
 - **Governance groups** — Group names (`"Payments Platform"`, `"Lending Platform"`, etc.) should exist in the Postman Admin Console before the workflow runs. Missing groups produce a 404 warning but do not fail the run.
 - **Auth credentials** — Real bearer tokens, OAuth client credentials, and mTLS certificates should be injected into Postman environments via the Postman Vault or environment variable overrides — not hardcoded in workflow files. For the loan origination service, mTLS certificate configuration is a **manual step** in the Postman client (cannot be set via environment variables).
+> **Note:** mTLS cannot be defined in the components/securitySchemes object in OpenAPI 3.0.x but can be defined in OpenAPI 3.1.0+
 - **GitLab CI adaptation** — Migration of the platform team's GitLab services require replicating this workflow as a `.gitlab-ci.yml` pipeline. The underlying action logic (Postman API calls) is CI-system-agnostic, but the YAML syntax, secret injection (`$CI_*` variables), and checkout steps differ. A working session is needed to adapt and test this.
 - **Services without OpenAPI specs** — Several services in the customer org lack specs or have drifted specs. The bootstrap action requires a valid OpenAPI 3.x spec at `spec-url`. These services need spec generation (via API gateway export, code annotation, or reverse-engineering from traffic) before onboarding. This is a scoping and prioritization conversation with the platform team.
 - **Postman Enterprise Access** — Several features require Postman Enterprise Access (paid or trial) such as Spec Hub, governance groups, and Bifrost features. Activate via Postman Admin Console or reach out to your Postman Customer Success Manager for details.
@@ -180,6 +183,7 @@ After a successful run, verify the following:
 | `GITHUB_TOKEN` lacking `workflow` scope for generated CI commits | Added `GH_FALLBACK_TOKEN` (PAT with `repo` + `workflow`) as fallback credential per README guidance |
 | Mock server test calls returning errors | Updated `baseUrl` in the Postman environment to match the generated mock server URL from action output |
 | Unfamiliarity with GitLab CI, Amazon API Gateway, ECS/ALB topology | Researched via docs, signed up for free accounts, and created test configurations for learning and approach validation |
+| Missing mTLS support for OpenAPI 3.0.x | Reviewing latest OpenAPI Initiative specification standards |
 
 ---
 
